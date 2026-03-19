@@ -4,7 +4,8 @@ const router = express.Router();
 const { redirectToDidit } = require("../controllers/verification.controller");
 const { diditWebhook } = require("../webhooks/didit.webhook");
 
-router.get("/verify", redirectToDidit);        // redirect user to Didit
-router.post("/webhook/didit", diditWebhook);   // webhook endpoint
+router.get("/verify", redirectToDidit);        
+router.post("/webhook/didit", diditWebhook);   
+router.get("/webhook/didit", diditWebhook);   
 
 module.exports = router;

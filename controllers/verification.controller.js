@@ -4,11 +4,11 @@ const IdVerification = require("../models/IdVerification");
 const redirectToDidit = async (req, res) => {
   try {
     const user = {
-      _id: req.body.userId || "test_user_123",
-      email: req.body.email || "test@gmail.com",
-      firstName: req.body.firstName || "John",
-      lastName: req.body.lastName || "Doe",
-      dob: req.body.dob || "1990-01-01"
+      _id: req.body.userId || null,
+      email: req.body.email || null,
+      firstName: req.body.firstName || null,
+      lastName: req.body.lastName || null,
+      dob: req.body.dob || null
     };
 
     const session = await createDiditSession(user);
