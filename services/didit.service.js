@@ -13,9 +13,9 @@ const createDiditSession = async (user) => {
         send_notification_emails: true,
       },
       expected_details: {
-        first_name: user.firstName || "John",
-        last_name: user.lastName || "Doe",
-        date_of_birth: user.dob || "1990-01-01"
+        first_name: user.firstName || null,
+        last_name: user.lastName || null,
+        date_of_birth: user.dob || null
       },
       language: "en"
     };

@@ -1,14 +1,14 @@
 const IdVerification = require("../models/IdVerification");
+const uploadImageToCloudinary = require("../utils/cloudinaryUpload");
 
 const diditWebhook = async (req, res) => {
   try {
-    // console.log("FULL WEBHOOK BODY:", JSON.stringify(req.body, null, 2));
-
     const {
       session_id,
       status,
       vendor_data,
-      decision
+      decision,
+      metadata
     } = req.body;
 
     // Extract document data
@@ -28,8 +28,8 @@ const diditWebhook = async (req, res) => {
         }]
       : [];
 
-    //  Extract images
-    const images = idData
+    // Extract image URLs/Base64 from webhook
+    const rawImages = idData
       ? {
           front: idData.front_image,
           back: idData.back_image,
@@ -39,16 +39,29 @@ const diditWebhook = async (req, res) => {
         }
       : {};
 
-    // Update DB
+    // Upload each image to Cloudinary and collect the secure URLs
+    const uploadPromises = Object.entries(rawImages).map(async ([key, imageData]) => {
+      if (!imageData) return [key, null];
+
+      // Generate a unique public ID using session_id and image type
+      const publicId = `${session_id}_${key}`;
+      const cloudinaryUrl = await uploadImageToCloudinary(imageData, publicId);
+      return [key, cloudinaryUrl];
+    });
+
+    const uploadedEntries = await Promise.all(uploadPromises);
+    const images = Object.fromEntries(uploadedEntries);
+
+    // Update the database with the new image URLs
     const updated = await IdVerification.findOneAndUpdate(
       { session_id },
       {
         status,
         vendor_data,
-        metadata: req.body.metadata,
+        metadata,
         decision,
         documents,
-        images
+        images // Now contains Cloudinary URLs
       },
       { new: true }
     );
@@ -56,13 +69,13 @@ const diditWebhook = async (req, res) => {
     if (!updated) {
       console.log("❌ Session not found");
     } else {
-      console.log("✅ Full KYC Data Stored");
+      console.log("✅ Full KYC Data Stored with Cloudinary images");
     }
 
     res.status(200).json({ message: "Webhook processed successfully" });
 
   } catch (error) {
-    // console.error("❌ Webhook Error:", error.message);
+    console.error("❌ Webhook Error:", error.message);
     res.status(500).json({ error: "Webhook failed" });
   }
 };
