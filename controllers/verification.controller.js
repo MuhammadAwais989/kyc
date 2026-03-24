@@ -13,7 +13,7 @@ const redirectToDidit = async (req, res) => {
 
     const session = await createDiditSession(user);
 
-    // Save session including URL
+    // Save initial session info
     await IdVerification.create({
       user_id: user._id,
       session_id: session.session_id,
@@ -23,9 +23,11 @@ const redirectToDidit = async (req, res) => {
       url: session.url
     });
 
+    // Redirect user to Didit verification page
     return res.redirect(session.url);
+
   } catch (error) {
-    console.error(error);
+    console.error("Verification redirect error:", error);
     return res.status(500).json({ error: "Failed to create Didit session or redirect" });
   }
 };

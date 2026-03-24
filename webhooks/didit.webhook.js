@@ -1,78 +1,73 @@
 const IdVerification = require("../models/IdVerification");
-const uploadImageToCloudinary = require("../utils/cloudinaryUpload");
+const uploadToCloudinary = require("../utils/cloudinaryUpload");
+const { generateAndUploadPdf } = require("../services/diditPdf.service");
 
 const diditWebhook = async (req, res) => {
   try {
-    const {
-      session_id,
-      status,
-      vendor_data,
-      decision,
-      metadata
-    } = req.body;
+    // Handle POST (webhook) or GET (testing)
+    const data = req.method === "POST" ? req.body : req.query;
 
-    // Extract document data
+    const session_id = data.session_id || data.verificationSessionId;
+    if (!session_id) return res.status(400).json({ error: "Missing session_id" });
+
+    const { status, vendor_data, decision, metadata } = data;
+
+    // Extract document info
     const idData = decision?.id_verifications?.[0];
+    const documents = idData ? [{
+      document_number: idData.document_number,
+      document_type: idData.document_type,
+      full_name: idData.full_name,
+      first_name: idData.first_name,
+      last_name: idData.last_name,
+      dob: idData.date_of_birth,
+      gender: idData.gender,
+      address: idData.formatted_address,
+      nationality: idData.issuing_state_name
+    }] : [];
 
-    const documents = idData
-      ? [{
-          document_number: idData.document_number,
-          document_type: idData.document_type,
-          full_name: idData.full_name,
-          first_name: idData.first_name,
-          last_name: idData.last_name,
-          dob: idData.date_of_birth,
-          gender: idData.gender,
-          address: idData.formatted_address,
-          nationality: idData.issuing_state_name
-        }]
-      : [];
+    // Upload images to Cloudinary
+    const rawImages = idData ? {
+      front: idData.front_image,
+      back: idData.back_image,
+      portrait: idData.portrait_image,
+      full_front: idData.full_front_image,
+      full_back: idData.full_back_image
+    } : {};
 
-    // Extract image URLs/Base64 from webhook
-    const rawImages = idData
-      ? {
-          front: idData.front_image,
-          back: idData.back_image,
-          portrait: idData.portrait_image,
-          full_front: idData.full_front_image,
-          full_back: idData.full_back_image
-        }
-      : {};
-
-    // Upload each image to Cloudinary and collect the secure URLs
     const uploadPromises = Object.entries(rawImages).map(async ([key, imageData]) => {
       if (!imageData) return [key, null];
-
-      // Generate a unique public ID using session_id and image type
       const publicId = `${session_id}_${key}`;
-      const cloudinaryUrl = await uploadImageToCloudinary(imageData, publicId);
-      return [key, cloudinaryUrl];
+      const url = await uploadToCloudinary(imageData, publicId);
+      return [key, url];
     });
 
     const uploadedEntries = await Promise.all(uploadPromises);
     const images = Object.fromEntries(uploadedEntries);
 
-    // Update the database with the new image URLs
+    // Generate PDF and upload to Cloudinary
+    const pdf_url = await generateAndUploadPdf(session_id);
+
+    // Update DB
     const updated = await IdVerification.findOneAndUpdate(
       { session_id },
-      {
-        status,
-        vendor_data,
-        metadata,
-        decision,
-        documents,
-        images // Now contains Cloudinary URLs
-      },
-      { new: true }
+      { status, vendor_data, metadata, decision, documents, images, pdf_url },
+      { returnDocument: 'after' }
     );
 
-    if (!updated) {
-      console.log("❌ Session not found");
-    } else {
-      console.log("✅ Full KYC Data Stored with Cloudinary images");
+    if (!updated) console.log("❌ Session not found");
+    else console.log("✅ KYC, images & PDF stored successfully");
+
+    // ✅ Automatic download URL
+    const downloadUrl = `${process.env.BASE_URL}/api/download-pdf/${session_id}`;
+
+    // If webhook is called via browser (for testing), redirect user
+    if (req.query.autoDownload === "true") {
+      return res.redirect(downloadUrl);
     }
 
-    res.status(200).json({ message: "Webhook processed successfully" });
+    // Otherwise, return download URL in webhook response
+    res.status(200).json({ message: "Webhook processed successfully", downloadUrl });
 
   } catch (error) {
     console.error("❌ Webhook Error:", error.message);

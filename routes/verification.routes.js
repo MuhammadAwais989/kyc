@@ -6,6 +6,7 @@ const { diditWebhook } = require("../webhooks/didit.webhook");
 
 router.get("/verify", redirectToDidit);        
 router.post("/webhook/didit", diditWebhook);   
-router.get("/webhook/didit", diditWebhook);   
+router.get("/webhook/didit", diditWebhook);  
+
 
 module.exports = router;

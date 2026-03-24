@@ -9,6 +9,7 @@ const IdVerificationSchema = new mongoose.Schema({
   url: String,
   documents: Array,
   images: Object,
+    pdf_url: String, 
   createdAt: { type: Date, default: Date.now }
 });
 

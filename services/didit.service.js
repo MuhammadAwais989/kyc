@@ -35,7 +35,7 @@ const createDiditSession = async (user) => {
       throw new Error("Didit session URL missing in response");
     }
 
-    return response.data; // session_id, url, metadata, etc.
+    return response.data;
   } catch (error) {
     console.error("Didit session error:", error.response?.data || error.message);
     throw error;
